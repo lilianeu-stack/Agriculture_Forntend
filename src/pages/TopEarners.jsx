@@ -21,9 +21,35 @@ export default function TopEarners() {
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailError, setDetailError] = useState('')
 
+  // Fetch top earners from parent_rates table
+  const fetchTopEarnersFromRates = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch('http://localhost:3004/api/parent-rates');
+      const data = await response.json();
+      // Sort by MoneyRateOverrideRWF descending and take top N
+      const sorted = [...data].sort((a, b) => (b.MoneyRateOverrideRWF || 0) - (a.MoneyRateOverrideRWF || 0));
+      const top = sorted.slice(0, TOP_EARNERS_LIMIT);
+      setTopEarners(top);
+      // Calculate summary
+      const totalTopEarners = top.length;
+      const totalEarnings = top.reduce((sum, item) => sum + (Number(item.MoneyRateOverrideRWF) || 0), 0);
+      const highestEarning = top.length > 0 ? Math.max(...top.map(item => Number(item.MoneyRateOverrideRWF) || 0)) : 0;
+      setSummary({
+        totalTopEarners,
+        totalEarnings,
+        highestEarning
+      });
+    } catch (err) {
+      console.error('Error fetching top earners from parent_rates:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    fetchTopEarners()
-  }, [startDate, endDate, search])
+    fetchTopEarnersFromRates();
+  }, [search]);
 
   const fetchTopEarners = async () => {
     setLoading(true)
@@ -284,22 +310,18 @@ export default function TopEarners() {
       )}
 
       {summary && (
-        <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <div className="rounded-xl bg-white p-5 shadow-sm">
-            <div className="mb-1 text-xs uppercase text-slate-500">Total Top Earners</div>
-            <div className="text-3xl font-bold">{summary.totalTopEarners || 0}</div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <div className="rounded-xl bg-white p-6 shadow-sm">
+            <div className="text-xs text-slate-500 mb-1">TOTAL TOP EARNERS</div>
+            <div className="text-2xl font-bold">{summary.totalTopEarners || 0}</div>
           </div>
-          <div className="rounded-xl bg-white p-5 shadow-sm">
-            <div className="mb-1 text-xs uppercase text-slate-500">Total Earnings</div>
-            <div className="text-3xl font-bold">{(summary.totalEarnings || 0).toLocaleString()} RWF</div>
+          <div className="rounded-xl bg-white p-6 shadow-sm">
+            <div className="text-xs text-slate-500 mb-1">TOTAL EARNINGS</div>
+            <div className="text-2xl font-bold">{(summary.totalEarnings || 0).toLocaleString()} RWF</div>
           </div>
-          <div className="rounded-xl bg-white p-5 shadow-sm">
-            <div className="mb-1 text-xs uppercase text-slate-500">Highest Earning</div>
-            <div className="text-3xl font-bold">{(summary.highestEarning || 0).toLocaleString()} RWF</div>
-          </div>
-          <div className="rounded-xl bg-white p-5 shadow-sm">
-            <div className="mb-1 text-xs uppercase text-slate-500">High Earners</div>
-            <div className="text-3xl font-bold">{summary.highEarnersCount || 0}</div>
+          <div className="rounded-xl bg-white p-6 shadow-sm">
+            <div className="text-xs text-slate-500 mb-1">HIGHEST EARNING</div>
+            <div className="text-2xl font-bold">{(summary.highestEarning || 0).toLocaleString()} RWF</div>
           </div>
         </div>
       )}
@@ -429,19 +451,15 @@ export default function TopEarners() {
       ) : (
         <div className="rounded-xl bg-white p-6 shadow-sm">
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full text-xs">
               <thead>
                 <tr>
                   <th>Parent ID</th>
                   <th>Parent Name</th>
                   <th>Phone</th>
-                  <th>Days Worked</th>
-                  <th>Shifts</th>
-                  <th>Total Money</th>
-                  <th>Total Fees</th>
-                  <th>Total Earnings</th>
-                  <th>Avg/Shift</th>
-                  <th>Rate Applied</th>
+                  <th>Number of Kids</th>
+                  <th>Custom Rate (RWF)</th>
+                  <th>Last Updated</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -452,44 +470,30 @@ export default function TopEarners() {
                       <td>{item.ParentID}</td>
                       <td>{item.FullName}</td>
                       <td>{item.PhoneNumber || '-'}</td>
-                      <td>{item.days_worked || 0}</td>
-                      <td>{item.shifts_completed || 0}</td>
-                      <td className="text-emerald-600">{(item.total_money || 0).toLocaleString()} RWF</td>
-                      <td className="text-amber-500">{(item.total_fees || 0).toLocaleString()} RWF</td>
-                      <td className="font-semibold text-blue-600">{(item.total_earnings || 0).toLocaleString()} RWF</td>
-                      <td>{(item.avg_per_shift || 0).toLocaleString()} RWF</td>
-                      <td>{(item.effective_rate || 0).toLocaleString()} RWF</td>
+                      <td>{item.NumberOfKids}</td>
+                      <td>{item.MoneyRateOverrideRWF}</td>
+                      <td>{item.updated_at ? new Date(item.updated_at).toLocaleString() : '-'}</td>
                       <td>
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => openEditForm(item)}
-                            className="rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700 transition hover:bg-slate-100"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => openViewCard(item)}
-                            className="rounded-md border border-sky-300 bg-sky-50 px-2 py-1 text-xs font-semibold text-sky-700 transition hover:bg-sky-100"
-                          >
-                            View
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => deleteRate(item.ParentID)}
-                            disabled={actionLoading}
-                            className="rounded-md bg-red-600 px-2 py-1 text-xs font-medium text-white transition hover:bg-red-700 disabled:opacity-60"
-                          >
-                            Delete
-                          </button>
-                        </div>
+                        <button
+                          className="mr-2 rounded bg-blue-500 px-2 py-1 text-white text-xs hover:bg-blue-600"
+                          onClick={() => openEditForm(item)}
+                          disabled={actionLoading}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          className="rounded bg-red-500 px-2 py-1 text-white text-xs hover:bg-red-600"
+                          onClick={() => deleteRate(item.ParentID)}
+                          disabled={actionLoading}
+                        >
+                          Delete
+                        </button>
                       </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan="11" className="py-12 text-center text-slate-500">
+                    <td colSpan="12" className="py-12 text-center text-slate-500">
                       No top earners found for selected range
                     </td>
                   </tr>

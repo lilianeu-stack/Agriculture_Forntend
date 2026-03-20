@@ -7,10 +7,12 @@ import Students from './pages/Students'
 import Shifts from './pages/Shifts'
 import Earnings from './pages/Earnings'
 import MoneyShifts from './pages/MoneyShifts'
+import Money from './pages/Money'
 import Reports from './pages/Reports'
 import SchoolFees from './pages/SchoolFees'
 import TopEarners from './pages/TopEarners'
 import Layout from './components/Layout'
+import ActiveShifts from './pages/ActiveShifts'
 
 function App() {
   const getRole = () => (sessionStorage.getItem('role') || '').trim().toLowerCase()
@@ -53,11 +55,13 @@ function App() {
           <Route path="student-parent" element={<StudentParent />} />
           <Route path="students" element={<Students />} />
           <Route path="shifts" element={<Shifts />} />
+          <Route path="active-shifts" element={<ActiveShifts />} />
           <Route path="earnings" element={<Earnings />} />
           <Route
             path="money-shifts"
             element={canAccessMoneyShifts() ? <MoneyShifts /> : <Navigate to={getDefaultRoute()} replace />}
           />
+          <Route path="money" element={<Money />} />
           <Route
             path="top-earners"
             element={canAccessTopEarners() ? <TopEarners /> : <Navigate to={getDefaultRoute()} replace />}

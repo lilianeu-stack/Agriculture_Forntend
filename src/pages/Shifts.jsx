@@ -2,6 +2,18 @@ import { useEffect, useState } from 'react'
 
 export default function Shifts() {
   const [rows, setRows] = useState([])
+  // Group invalid shifts by parent
+  const invalidShiftsByParent = {};
+  if (Array.isArray(rows)) {
+    rows.forEach((row) => {
+      if (!row.valid) {
+        if (!invalidShiftsByParent[row.ParentID]) {
+          invalidShiftsByParent[row.ParentID] = [];
+        }
+        invalidShiftsByParent[row.ParentID].push(row);
+      }
+    });
+  }
   const [loading, setLoading] = useState(true)
   const [startDate, setStartDate] = useState('2025-10-01')
   const [endDate, setEndDate] = useState('2025-10-31')
@@ -230,7 +242,8 @@ export default function Shifts() {
                 <div className="rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{detailError}</div>
               ) : personDetails ? (
                 <>
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  {/* Only shift summary, no money or school fees shown */}
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div className="rounded-xl border border-slate-200 bg-white p-4 text-center shadow-sm">
                       <div className="text-2xl font-bold text-emerald-600">{personDetails.totals?.totalShiftsDone || 0}</div>
                       <div className="mt-1 text-xs uppercase tracking-wide text-slate-500">Total Shifts</div>
@@ -238,10 +251,6 @@ export default function Shifts() {
                     <div className="rounded-xl border border-slate-200 bg-white p-4 text-center shadow-sm">
                       <div className="text-2xl font-bold text-blue-700">{personDetails.totals?.completedShifts || 0}</div>
                       <div className="mt-1 text-xs uppercase tracking-wide text-slate-500">Completed Shifts</div>
-                    </div>
-                    <div className="rounded-xl border border-slate-200 bg-white p-4 text-center shadow-sm">
-                      <div className="text-2xl font-bold text-slate-800">{personDetails.totals?.totalDaysWorked || 0}</div>
-                      <div className="mt-1 text-xs uppercase tracking-wide text-slate-500">Days Worked</div>
                     </div>
                   </div>
 
@@ -317,56 +326,144 @@ export default function Shifts() {
             <table className="w-full">
               <thead>
                 <tr>
-                  <th>Date</th>
+                  <th> Start Date</th>
+                  <th>End Date</th>
                   <th>Parent ID</th>
                   <th>Parent Name</th>
                   <th>Shift Name</th>
                   <th>Check-In</th>
                   <th>Check-Out</th>
                   <th>Device Type</th>
-                  <th>Money Earned</th>
-                  <th>Fees Earned</th>
-                  <th>Total Earned</th>
-                  <th>Rate Applied</th>
+                  <th>Status</th>
+                  <th>Valid</th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {rows.length > 0 ? (
-                  rows.map((item, index) => (
-                    <tr key={`${item.ParentID}-${item.AccessDate}-${item.shift_name}-${index}`}>
-                      <td>{item.AccessDate || '-'}</td>
-                      <td>{item.ParentID || '-'}</td>
-                      <td>{item.FullName || '-'}</td>
-                      <td>{item.shift_name || '-'}</td>
-                      <td>{item.check_in_time || '-'}</td>
-                      <td>{item.check_out_time || '-'}</td>
-                      <td>{item.device_type_for_calc || '-'}</td>
-                      <td className="text-emerald-600">{(item.money_earned_rwf || 0).toLocaleString()} RWF</td>
-                      <td className="text-amber-500">{(item.fee_earned_rwf || 0).toLocaleString()} RWF</td>
-                      <td className="font-semibold text-blue-600">{(item.total_earned || 0).toLocaleString()} RWF</td>
-                      <td>{(item.applied_rate || 0).toLocaleString()} RWF</td>
-                      <td>
-                        <button
-                          type="button"
-                          onClick={() => openViewCard(item)}
-                          className="rounded-md border border-sky-300 bg-sky-50 px-2 py-1 text-xs font-semibold text-sky-700 transition hover:bg-sky-100"
-                        >
-                          View
-                        </button>
+                {(() => {
+                  // Helper to determine shift period
+                  function getShiftPeriod(time) {
+                    if (!time) return '-';
+                    const hour = parseInt(time.split(':')[0], 10);
+                    if (hour < 12) return 'Morning';
+                    if (hour < 17) return 'Afternoon';
+                    return 'Evening';
+                  }
+
+                  // Deduplicate: key = ParentID + AccessDate + shift period
+                  const seen = new Set();
+                  const filteredRows = rows.filter(item => {
+                    const period = getShiftPeriod(item.check_in_time || item.start_time);
+                    const key = `${item.ParentID}-${item.AccessDate}-${period}`;
+                    if (seen.has(key)) {
+                      item.valid = false;
+                      return false; // Don't show duplicate
+                    }
+                    seen.add(key);
+                    return true;
+                  });
+
+                  return filteredRows.length > 0 ? (
+                    filteredRows.map((item, index) => {
+                      const period = getShiftPeriod(item.check_in_time || item.start_time);
+                      return (
+                        <tr key={`${item.ParentID}-${item.AccessDate}-${period}-${index}`}>
+                          <td>{startDate}</td>
+                          <td>{endDate}</td>
+                          <td>{item.ParentID || '-'}</td>
+                          <td>{item.FullName || '-'}</td>
+                          <td>{period}</td>
+                          <td>{item.check_in_time || '-'}</td>
+                          <td>{item.check_out_time || '-'}</td>
+                          <td>{item.device_type_for_calc || '-'}</td>
+                          <td>
+                            <span
+                              className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${
+                                item.check_out_time
+                                  ? 'bg-emerald-100 text-emerald-700'
+                                  : 'bg-amber-100 text-amber-700'
+                              }`}
+                            >
+                              {item.check_out_time ? 'Completed' : 'In Progress'}
+                            </span>
+                          </td>
+                          <td>
+                            <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${item.valid ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700'}`}>
+                              {item.valid ? 'Valid' : 'Invalid'}
+                            </span>
+                          </td>
+                          <td>
+                            <button
+                              type="button"
+                              onClick={() => openViewCard(item)}
+                              className="rounded-md border border-sky-300 bg-sky-50 px-2 py-1 text-xs font-semibold text-sky-700 transition hover:bg-sky-100"
+                            >
+                              View
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  ) : (
+                    <tr>
+                      <td colSpan="11" className="py-12 text-center text-slate-500">
+                        No worked shifts found in this date range
                       </td>
                     </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan="12" className="py-12 text-center text-slate-500">
-                      No worked shifts found in this date range
-                    </td>
-                  </tr>
-                )}
+                  );
+                })()}
               </tbody>
             </table>
           </div>
+        </div>
+      )}
+      {/* Show invalid shifts summary per parent */}
+      {Object.keys(invalidShiftsByParent).length > 0 && (
+        <div className="mt-8">
+          <h2 className="text-lg font-semibold text-red-700 mb-4">Invalid Shifts Summary</h2>
+          {Object.entries(invalidShiftsByParent).map(([parentId, shifts]) => {
+            // Filter invalid shifts by selected date range
+            const filteredShifts = shifts.filter(shift => {
+              const date = shift.AccessDate || '';
+              return date >= startDate && date <= endDate;
+            });
+            if (filteredShifts.length === 0) return null;
+            return (
+              <div key={parentId} className="mb-6 p-4 rounded-lg border border-red-200 bg-red-50">
+                <div className="mb-2 font-semibold text-red-800">
+                  Parent ID: {parentId} — This person has {filteredShifts.length} invalid shift{filteredShifts.length > 1 ? 's' : ''} in the selected date range.
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr>
+                        <th>Start Date</th>
+                        <th>End Date</th>
+                        <th>Date</th>
+                        <th>Shift Name</th>
+                        <th>Check-In</th>
+                        <th>Check-Out</th>
+                        <th>Device Type</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredShifts.map((shift, idx) => (
+                        <tr key={idx}>
+                          <td>{startDate}</td>
+                          <td>{endDate}</td>
+                          <td>{shift.AccessDate || '-'}</td>
+                          <td>{shift.shift_name || '-'}</td>
+                          <td>{shift.check_in_time || '-'}</td>
+                          <td>{shift.check_out_time || '-'}</td>
+                          <td>{shift.device_type_for_calc || '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

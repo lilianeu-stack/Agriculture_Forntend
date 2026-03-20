@@ -122,17 +122,26 @@ export default function Layout() {
     { path: '/parents', label: 'Parents', icon: 'parents', roles: ['admin'] },
     { path: '/student-parent', label: 'StudentParent', icon: 'student-parent', roles: ['admin'] },
     { path: '/students', label: 'Students', icon: 'students', roles: ['admin', 'fees'] },
-    { path: '/shifts', label: 'Shifts', icon: 'shifts', roles: ['admin', 'shift'] },
+    { path: '/shifts', label: 'Worked Shifts', icon: 'shifts', roles: ['admin', 'shift'] },
+    { path: '/active-shifts', label: 'Active Shifts', icon: 'shifts', roles: ['admin', 'shift'] },
     { path: '/earnings', label: 'Parents Earnings', icon: 'earnings', roles: ['admin'] },
     { path: '/top-earners', label: 'Top Earners', icon: 'top-earners', roles: ['admin', 'money'] },
-    { path: '/money-shifts', label: 'Money Shifts', icon: 'money-shifts', roles: ['money'] },
-    { path: '/school-fees', label: 'School Fees', icon: 'school-fees', roles: ['admin', 'money', 'fees', 'shift'] },
+    // Removed 'money-shifts' for 'money' role
+    { path: '/school-fees', label: 'School Fees', icon: 'school-fees', roles: ['admin', 'money', 'fees'] },
+    { path: '/money', label: 'Money', icon: 'money-shifts', roles: ['admin', 'money', 'fees'] },
     { path: '/reports', label: 'Reports', icon: 'reports', roles: ['admin', 'money', 'fees', 'shift'] },
-  ]
+  ];
 
-  // Filter navigation items based on user role
-  const role = (sessionStorage.getItem('role') || '').trim().toLowerCase()
-  const navItems = allNavItems.filter(item => item.roles.includes(role))
+  // Custom nav filtering for 'money' role: only allow 'money', 'school-fees', 'top-earners', 'dashboard', 'reports'
+  const role = (sessionStorage.getItem('role') || '').trim().toLowerCase();
+  let navItems;
+  if (role === 'money') {
+    navItems = allNavItems.filter(item =>
+      ['/','/money','/school-fees','/top-earners'].includes(item.path)
+    );
+  } else {
+    navItems = allNavItems.filter(item => item.roles.includes(role));
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 pt-[96px]">

@@ -9,6 +9,7 @@ export default function Parents() {
   const [formData, setFormData] = useState({
     FullName: '',
     PhoneNumber: '',
+    MomoVerify: '',
     Gender: '',
     NumberOfKids: ''
   })
@@ -48,7 +49,7 @@ export default function Parents() {
       
       setShowModal(false)
       setEditingParent(null)
-      setFormData({ FullName: '', PhoneNumber: '', Gender: '', NumberOfKids: '' })
+      setFormData({ FullName: '', PhoneNumber: '', MomoVerify: '', Gender: '', NumberOfKids: '' })
       fetchParents()
     } catch (err) {
       console.error('Error saving parent:', err)
@@ -60,6 +61,7 @@ export default function Parents() {
     setFormData({
       FullName: parent.FullName,
       PhoneNumber: parent.PhoneNumber || '',
+      MomoVerify: parent.MomoVerify || '',
       Gender: parent.Gender || '',
       NumberOfKids: parent.NumberOfKids || ''
     })
@@ -92,7 +94,7 @@ export default function Parents() {
       <div className="mb-4 flex gap-3">
         <input
           type="text"
-          placeholder="Search parents..."
+          placeholder="Search by parent name, ID, or phone"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-green-600 focus:ring-2 focus:ring-green-100"
@@ -110,6 +112,7 @@ export default function Parents() {
                   <th>ID</th>
                   <th>Full Name</th>
                   <th>Phone</th>
+                  <th>MomoVerify</th>
                   <th>Gender</th>
                   <th>Kids</th>
                   <th>Actions</th>
@@ -122,6 +125,7 @@ export default function Parents() {
                       <td>{parent.ParentID}</td>
                       <td>{parent.FullName}</td>
                       <td>{parent.PhoneNumber || '-'}</td>
+                      <td>{parent.MomoVerify || '-'}</td>
                       <td>{parent.Gender || '-'}</td>
                       <td>{parent.NumberOfKids || 0}</td>
                       <td className="space-x-2">
@@ -170,11 +174,20 @@ export default function Parents() {
                   />
                 </div>
                 <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700">MomoVerify</label>
+                  <input
+                    type="text"
+                    value={formData.MomoVerify}
+                    onChange={(e) => setFormData({ ...formData, MomoVerify: e.target.value })}
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-green-600 focus:ring-2 focus:ring-green-100"
+                  />
+                </div>
+                <div>
                   <label className="mb-2 block text-sm font-medium text-slate-700">Gender</label>
                   <select value={formData.Gender} onChange={(e) => setFormData({ ...formData, Gender: e.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-green-600 focus:ring-2 focus:ring-green-100">
                     <option value="">Select</option>
-                    <option value="Male">Male</option>
-                    <option value="Female">Female</option>
+                    <option value="Father">Father</option>
+                    <option value="Mother">Mother</option>
                   </select>
                 </div>
                 <div>
