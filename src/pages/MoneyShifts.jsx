@@ -1,7 +1,12 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 
+
 export default function MoneyShifts() {
+  const role = sessionStorage.getItem('role') || '';
+  if (role === 'money') {
+    return null;
+  }
   const [shifts, setShifts] = useState([])
   const [parentEarnings, setParentEarnings] = useState([])
   const [detailedEarnings, setDetailedEarnings] = useState([])

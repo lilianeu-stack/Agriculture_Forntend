@@ -160,11 +160,16 @@ export default function SchoolFees() {
         StudentID: rel.StudentID,
         Registration_Number: rel.Registration_Number,
         StudentName: `${rel.StudentFirstName} ${rel.StudentLastName}`,
+        StudentClass: rel.Class || rel.StudentClass || '',
         FatherID: '',
         FatherName: '',
         MotherID: '',
         MotherName: '',
       };
+    }
+    // Always update class if present
+    if (rel.Class) {
+      acc[rel.StudentID].StudentClass = rel.Class;
     }
     if (rel.Relationship === 'Father') {
       acc[rel.StudentID].FatherID = rel.ParentID;
@@ -287,6 +292,7 @@ export default function SchoolFees() {
                   <th>Student ID</th>
                   <th>Registration Number</th>
                   <th>Student Name</th>
+                  <th>Class</th>
                   <th>Father ID</th>
                   <th>Father Name</th>
                   <th>Mother ID</th>
@@ -303,6 +309,7 @@ export default function SchoolFees() {
                     <td>{rel.StudentID}</td>
                     <td>{rel.Registration_Number}</td>
                     <td>{rel.StudentName}</td>
+                    <td>{rel.StudentClass || ''}</td>
                     <td>{rel.FatherID}</td>
                     <td>{rel.FatherName}</td>
                     <td>{rel.MotherID}</td>

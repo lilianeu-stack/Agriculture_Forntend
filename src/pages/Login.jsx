@@ -34,7 +34,7 @@ export default function Login() {
       // Redirect based on role
       const role = data.user.role
       if (role === 'money') {
-        navigate('/money-shifts')
+        navigate('/')
       } else if (role === 'fees') {
         navigate('/school-fees')
       } else if (role === 'admin') {

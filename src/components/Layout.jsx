@@ -166,6 +166,7 @@ export default function Layout() {
             className="fixed inset-0 z-20 bg-black/30 md:hidden"
           />
         )}
+      
 
         <aside
           className={`fixed bottom-0 left-0 top-[96px] z-30 flex w-[260px] flex-col border-r border-slate-200 bg-white py-6 text-black transition-transform duration-200 md:translate-x-0 ${

@@ -1,4 +1,15 @@
 import { useState, useEffect } from 'react'
+
+// Utility to fetch active shifts for chart labels
+async function fetchActiveShifts() {
+  try {
+    const res = await fetch('http://localhost:3004/api/shifts?active=1&limit=5')
+    const data = await res.json()
+    return data.slice(0, 5).map(s => s.shift_name)
+  } catch {
+    return []
+  }
+}
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -14,44 +25,54 @@ import { Bar, Doughnut, Line } from 'react-chartjs-2'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, ArcElement, Tooltip, Legend)
 
+
 export default function Dashboard() {
   const role = sessionStorage.getItem('role') || 'admin'
   const [stats, setStats] = useState(null)
   const [topEarners, setTopEarners] = useState([])
   const [shiftReport, setShiftReport] = useState([])
   const [shiftCardStats, setShiftCardStats] = useState(null)
+  const [activeShiftNames, setActiveShiftNames] = useState([])
   const [feesSummary, setFeesSummary] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  // Date range and granularity for dashboard
+  const [startDate, setStartDate] = useState(() => {
+    const today = new Date();
+    return new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+  });
+  const [endDate, setEndDate] = useState(() => {
+    const today = new Date();
+    return today.toISOString().split('T')[0];
+  });
+  const [granularity, setGranularity] = useState('day'); // 'day', 'month', 'year'
 
   useEffect(() => {
     fetchDashboardStats()
-  }, [role])
+    fetchActiveShifts().then(setActiveShiftNames)
+  }, [role, startDate, endDate, granularity])
 
   const fetchDashboardStats = async () => {
     setLoading(true)
     setError('')
 
-    const today = new Date()
-    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0]
-    const todayStr = today.toISOString().split('T')[0]
-
     try {
-      const dashboardPromise = fetch('http://localhost:3004/api/dashboard/stats')
+      // Pass granularity as a query param if supported by backend
+      const dashboardPromise = fetch(`http://localhost:3004/api/dashboard/stats?startDate=${startDate}&endDate=${endDate}&granularity=${granularity}`)
       const topEarnersPromise = ['admin', 'money'].includes(role)
-        ? fetch(`http://localhost:3004/api/top-earners/dashboard?startDate=${monthStart}&endDate=${todayStr}&minRate=2000&limit=8`)
+        ? fetch(`http://localhost:3004/api/top-earners/dashboard?startDate=${startDate}&endDate=${endDate}&minRate=2000&limit=8&granularity=${granularity}`)
         : Promise.resolve(null)
 
       const shiftReportPromise = ['admin', 'shift'].includes(role)
-        ? fetch(`http://localhost:3004/api/reports/shift-performance?startDate=${monthStart}&endDate=${todayStr}`)
+        ? fetch(`http://localhost:3004/api/reports/shift-performance?startDate=${startDate}&endDate=${endDate}&granularity=${granularity}`)
         : Promise.resolve(null)
 
       const shiftCardStatsPromise = role === 'shift'
-        ? fetch(`http://localhost:3004/api/dashboard/shift-card-stats?year=${today.getFullYear()}&month=${today.getMonth() + 1}`)
+        ? fetch(`http://localhost:3004/api/dashboard/shift-card-stats?year=${new Date(startDate).getFullYear()}&month=${new Date(startDate).getMonth() + 1}`)
         : Promise.resolve(null)
 
       const schoolFeesPromise = ['admin', 'fees', 'shift'].includes(role)
-        ? fetch('http://localhost:3004/api/school-fees/students')
+        ? fetch(`http://localhost:3004/api/school-fees/students?startDate=${startDate}&endDate=${endDate}&granularity=${granularity}`)
         : Promise.resolve(null)
 
       const [dashboardRes, topEarnersRes, shiftReportRes, schoolFeesRes, shiftCardStatsRes] = await Promise.all([
@@ -96,16 +117,19 @@ export default function Dashboard() {
     }
   }
 
-  const weeklyTrendChart = {
-    labels: (stats?.monthlyTrend || stats?.weeklyTrend || []).map((d) => d.date),
+  // Grouped bar chart for money and fees per day in selected range
+  const moneyFeesPerformanceChart = {
+    labels: (stats?.monthlyTrend || stats?.weeklyTrend || []).map(d => d.date),
     datasets: [
       {
-        label: 'Daily Earnings This Month (RWF)',
-        data: (stats?.monthlyTrend || stats?.weeklyTrend || []).map((d) => Number(d.daily_earnings) || 0),
-        borderColor: '#16a34a',
-        backgroundColor: 'rgba(22, 163, 74, 0.2)',
-        tension: 0.3,
-        fill: true
+        label: 'Money Earnings (RWF)',
+        data: (stats?.monthlyTrend || stats?.weeklyTrend || []).map(d => Number(d.money_earned) || 0),
+        backgroundColor: '#16a34a'
+      },
+      {
+        label: 'Fees Earnings (RWF)',
+        data: (stats?.monthlyTrend || stats?.weeklyTrend || []).map(d => Number(d.fee_earned) || 0),
+        backgroundColor: '#2563eb'
       }
     ]
   }
@@ -176,9 +200,8 @@ export default function Dashboard() {
 
   const roleCards = {
     admin: baseCards,
-    money: [baseCards[2], baseCards[3], baseCards[4], { label: 'Top Earners (This Month)', value: topEarners.length }],
+    money: [baseCards[2], baseCards[3], { label: 'Top Earners (This Month)', value: topEarners.length }],
     shift: [
-      { label: 'Shifts Per Month', value: shiftCardStats?.shiftsPerMonth ?? 0 },
       { label: 'Active Devices', value: shiftCardStats?.activeDevices ?? 0 },
       { label: 'Active Shifts', value: shiftCardStats?.activeShifts ?? 0 }
     ],
@@ -197,6 +220,24 @@ export default function Dashboard() {
     <div>
       {error && <div className="mb-4 rounded-lg bg-red-100 px-4 py-3 text-sm text-red-800">{error}</div>}
 
+      {/* Date range and granularity pickers for admin dashboard */}
+      {role === 'admin' && (
+        <div className="mb-4 flex gap-3 items-center">
+          <label className="flex items-center gap-2 text-sm font-medium">From:
+            <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-green-600 focus:ring-2 focus:ring-green-100" />
+          </label>
+          <label className="flex items-center gap-2 text-sm font-medium">To:
+            <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-green-600 focus:ring-2 focus:ring-green-100" />
+          </label>
+          <label className="flex items-center gap-2 text-sm font-medium">View:
+            <select value={granularity} onChange={e => setGranularity(e.target.value)} className="rounded-lg border border-slate-300 px-3 py-2 text-sm">
+              <option value="day">Day</option>
+              <option value="month">Month</option>
+              <option value="year">Year</option>
+            </select>
+          </label>
+        </div>
+      )}
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {(roleCards[role] || roleCards.admin).map((card) => (
           <div key={card.label} className="rounded-xl bg-white p-5 shadow-sm">
@@ -206,37 +247,65 @@ export default function Dashboard() {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-        <div className="rounded-xl bg-white p-6 shadow-sm">
-          <div className="mb-4 border-b border-slate-200 pb-4">
-            <h3 className="text-lg font-semibold">Monthly Earnings Trend</h3>
+      {/* Admin: Money & Fees Performance (Per Day) */}
+      {role === 'admin' && (
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+          <div className="rounded-xl bg-white p-6 shadow-sm">
+            <div className="mb-4 border-b border-slate-200 pb-4">
+              <h3 className="text-lg font-semibold">Money & Fees Performance (Per Day)</h3>
+            </div>
+            {(stats?.monthlyTrend?.length > 0 || stats?.weeklyTrend?.length > 0) ? (
+              <div className="h-72 md:h-80">
+                <Bar data={moneyFeesPerformanceChart} options={chartOptions} />
+              </div>
+            ) : (
+              <div className="flex h-72 items-center justify-center text-center text-slate-500 md:h-80">
+                <h3>No data available</h3>
+              </div>
+            )}
           </div>
-          {(stats?.monthlyTrend?.length > 0 || stats?.weeklyTrend?.length > 0) ? (
-            <div className="h-72 md:h-80">
-              <Line data={weeklyTrendChart} options={chartOptions} />
-            </div>
-          ) : (
-            <div className="flex h-72 items-center justify-center text-center text-slate-500 md:h-80">
-              <h3>No data available</h3>
-            </div>
-          )}
         </div>
+      )}
 
-        <div className="rounded-xl bg-white p-6 shadow-sm">
-          <div className="mb-4 border-b border-slate-200 pb-4">
-            <h3 className="text-lg font-semibold">Attendance Snapshot</h3>
+      {/* Shift: Shift Performance Chart with Date Pickers */}
+      {role === 'shift' && (
+        <div className="rounded-xl bg-white p-6 shadow-sm mt-6">
+          <div className="mb-4 flex gap-3">
+            <label className="flex items-center gap-2 text-sm font-medium">From:
+              <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-green-600 focus:ring-2 focus:ring-green-100" />
+            </label>
+            <label className="flex items-center gap-2 text-sm font-medium">To:
+              <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-green-600 focus:ring-2 focus:ring-green-100" />
+            </label>
           </div>
-          {stats?.totalParents ? (
+          <div className="mb-4 border-b border-slate-200 pb-4">
+            <h3 className="text-lg font-semibold">Shift Performance (Per Shift)</h3>
+          </div>
+          {shiftReport.length > 0 && activeShiftNames.length > 0 ? (
             <div className="h-72 md:h-80">
-              <Doughnut data={attendanceChart} options={chartOptions} />
+              <Bar
+                data={{
+                  labels: activeShiftNames,
+                  datasets: activeShiftNames.map((name, idx) => ({
+                    label: name,
+                    data: [
+                      (() => { const found = shiftReport.find(s => s.shift_name === name); return found ? Number(found.total_money) || 0 : 0 })(),
+                      (() => { const found = shiftReport.find(s => s.shift_name === name); return found ? Number(found.total_fees) || 0 : 0 })(),
+                      (() => { const found = shiftReport.find(s => s.shift_name === name); return found ? Number(found.total_earnings) || 0 : 0 })()
+                    ],
+                    backgroundColor: ['#16a34a', '#2563eb', '#f59e0b'][idx % 3]
+                  }))
+                }}
+                options={chartOptions}
+              />
             </div>
           ) : (
             <div className="flex h-72 items-center justify-center text-center text-slate-500 md:h-80">
-              <h3>No data available</h3>
+              <h3>No shift data available</h3>
             </div>
           )}
         </div>
-      </div>
+      )}
 
       {['money'].includes(role) && (
         <div className="mt-6 rounded-xl bg-white p-6 shadow-sm">
@@ -256,11 +325,23 @@ export default function Dashboard() {
       {['fees'].includes(role) && (
         <div className="mt-6 rounded-xl bg-white p-6 shadow-sm">
           <div className="mb-4 border-b border-slate-200 pb-4">
-            <h3 className="text-lg font-semibold">School Fees Status</h3>
+            <h3 className="text-lg font-semibold">School Fees & Money Earnings</h3>
           </div>
           {feesSummary ? (
             <div className="h-72 md:h-80">
-              <Doughnut data={feesChart} options={chartOptions} />
+              <Bar
+                data={{
+                  labels: ['Money Earnings', 'Fees Earnings'],
+                  datasets: [
+                    {
+                      label: 'Amount (RWF)',
+                      data: [Number(feesSummary?.totalMoney || 0), Number(feesSummary?.totalFees || 0)],
+                      backgroundColor: ['#16a34a', '#2563eb']
+                    }
+                  ]
+                }}
+                options={chartOptions}
+              />
             </div>
           ) : (
             <div className="flex h-72 items-center justify-center text-center text-slate-500 md:h-80">No school fees data available</div>
